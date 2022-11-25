@@ -1,0 +1,25 @@
+diff -ur twm-1.0.8-orig/src/add_window.c twm-1.0.8/src/add_window.c
+--- twm-1.0.8-orig/src/add_window.c	2013-09-06 21:59:33.000000000 -0400
++++ twm-1.0.8/src/add_window.c	2013-11-11 14:11:26.545416012 -0500
+@@ -408,10 +408,19 @@
+      */
+     if (HandlingEvents && ask_user && !restoredFromPrevSession) {
+       if (Scr->RandomPlacement) {	/* just stick it somewhere */
++	/* Avoid putting the new window off-screen */
+ 	if ((PlaceX + tmp_win->attr.width) > Scr->MyDisplayWidth)
+-	    PlaceX = 50;
++	{
++	    PlaceX = Scr->MyDisplayWidth - tmp_win->attr.width;
++	    if ( PlaceX < 0 ) PlaceX = 0;
++	    if ( PlaceX > 50 ) PlaceX = 50;
++	}
+ 	if ((PlaceY + tmp_win->attr.height) > Scr->MyDisplayHeight)
+-	    PlaceY = 50;
++	{
++	    PlaceY = Scr->MyDisplayHeight - tmp_win->attr.height;
++	    if ( PlaceY < 0 ) PlaceY = 0;
++	    if ( PlaceY > 50 ) PlaceY = 50;
++	}
+ 
+ 	tmp_win->attr.x = PlaceX;
+ 	tmp_win->attr.y = PlaceY;

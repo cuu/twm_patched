@@ -1,0 +1,131 @@
+*** add_window.c	2018/03/30 17:50:51	1.1
+--- add_window.c	2018/03/30 18:15:20
+***************
+*** 240,259 ****
+  
+      tmp_win->wmhints = XGetWMHints(dpy, tmp_win->w);
+  
+!     if (tmp_win->wmhints)
+      {
+! 	if (restore_iconified)
+  	{
+  	    tmp_win->wmhints->initial_state = IconicState;
+  	    tmp_win->wmhints->flags |= StateHint;
+! 	}
+  
+! 	if (restore_icon_info_present)
+! 	{
+  	    tmp_win->wmhints->icon_x = restore_icon_x;
+  	    tmp_win->wmhints->icon_y = restore_icon_y;
+  	    tmp_win->wmhints->flags |= IconPositionHint;
+! 	}
+      }
+  
+      if (tmp_win->wmhints && (tmp_win->wmhints->flags & WindowGroupHint))
+--- 240,283 ----
+  
+      tmp_win->wmhints = XGetWMHints(dpy, tmp_win->w);
+  
+!     if (!tmp_win->wmhints)
+      {
+!         tmp_win->wmhints = gen_synthetic_wmhints(tmp_win);
+!         if (!tmp_win->wmhints)
+  	{
++             fprintf(stderr, "Failed allocating memory for hints!\n");
++ 	    free(tmp_win); // XXX leaky
++ 	    return NULL;
++ 	}
++     }
++     if (tmp_win->wmhints)
++     {
++         if (restore_iconified)
++         {
+  	    tmp_win->wmhints->initial_state = IconicState;
+  	    tmp_win->wmhints->flags |= StateHint;
+!         }
+  
+!         if (restore_icon_info_present)
+!         {
+  	    tmp_win->wmhints->icon_x = restore_icon_x;
+  	    tmp_win->wmhints->icon_y = restore_icon_y;
+  	    tmp_win->wmhints->flags |= IconPositionHint;
+!         }
+!     }
+! 
+!     /* XXX Forcing input true?  Revisit. */
+!     if (tmp_win->wmhints)
+!     {
+!         tmp_win->wmhints->input = True;
+!     }
+! 
+!     /* CL: Having with not willing focus
+!        cause problems with AutoSqueeze and a few others
+!        things. So I suppress it. And the whole focus thing
+!        is buggy anyway */
+!     if (!(tmp_win->wmhints->flags & InputHint)) {
+!         tmp_win->wmhints->input = True;
+      }
+  
+      if (tmp_win->wmhints && (tmp_win->wmhints->flags & WindowGroupHint))
+*** util.c	2018/03/30 19:34:12	1.1
+--- util.c	2018/03/30 19:31:22
+***************
+*** 995,997 ****
+--- 995,1038 ----
+  #endif
+      return;
+  }
++ 
++ /*
++  * Create synthetic WM_HINTS info for windows.  When a window specifies
++  * stuff, we should probably pay attention to it (though we don't
++  * always; x-ref comments in AddWindow() especially about focus).
++  * However, when it doesn't tell us anything at all, we should assume
++  * something useful.  "Window managers are free to assume convenient
++  * values for all fields of the WM_HINTS property if a window is mapped
++  * without one."  (ICCCM Ch. 4,
++  * <https://www.x.org/releases/X11R7.7/doc/xorg-docs/icccm/icccm.html#Client_Properties>).
++  *
++  * Specifically, we assume it wants us to give it focus.  It's fairly
++  * bogus for a window not to tell us anything, but e.g current versions
++  * of Chrome do (don't do) just that.  So we better make up something
++  * useful.
++  *
++  * Should probably be some configurability for this, so make the func
++  * take the window, even though we don't currently do anything useful
++  * with it...
++  */
++ XWMHints *
++ gen_synthetic_wmhints(TwmWindow *win)
++ {
++ 	XWMHints *hints;
++ 
++ 	hints = XAllocWMHints();
++ 	if(!hints) {
++ 		return NULL;
++ 	}
++ 
++ 	/*
++ 	 * Reasonable defaults.  Takes input, in normal state.
++ 	 *
++ 	 * XXX Make configurable?
++ 	 */
++ 	hints->flags = InputHint | StateHint;
++ 	hints->input = True;
++ 	hints->initial_state = NormalState;
++ 
++ 	return hints;
++ }
+*** util.h	2018/03/30 19:34:12	1.1
+--- util.h	2018/03/30 19:31:50
+***************
+*** 89,94 ****
+--- 89,96 ----
+  extern void SetFocus ( TwmWindow *tmp_win, Time time );
+  extern void Bell ( int type, int percent, Window win );
+  
++ extern XWMHints *gen_synthetic_wmhints(TwmWindow *win);
++ 
+  extern int HotX, HotY;
+  
+  #define	WM_BELL			0
